@@ -1,17 +1,17 @@
 const express = require('express')
-const BlogController = require('../controllers/orderController');
+const BlogController = require('../controllers/blogController');
 
 const blogRouter = express.Router();
 
-blogRouter.post('/', BlogController.createOrder)
+blogRouter.post('/', BlogController.createBlog)
 
-blogRouter.get('/:blogId', BlogController.getOrder)
+blogRouter.get('/:blogId', BlogController.getBlog)
 
-blogRouter.get('/', BlogController.getOrders)
+blogRouter.get('/', BlogController.getBlogs)
 
-blogRouter.patch('/:id', BlogController.updateOrder)
+blogRouter.patch('/:id', BlogController.updateBlog)
 
-blogRouter.delete('/:id', BlogController.deleteOrder)
+blogRouter.delete('/:id', BlogController.deleteBlog)
 
 
 module.exports = blogRouter;

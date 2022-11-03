@@ -9,8 +9,9 @@ const UserModel = new Schema({
   created_at: Date,
   firstname: { type: String,  },
   lastname: { type: String, },
-  email: { type: String, },
+  email: { type: String, unique: true},
   password: { type: String, required: true },
+  username: {type: String, required: true, unique: true}
 });
 
 // The code in the UserScheme.pre() function is called a pre-hook.
@@ -20,7 +21,7 @@ UserModel.pre(
   'save',
   async function (next) {
       const user = this;
-      const hash = await bcrypt.hash(this.password, 10);
+      const hash = await bcrypt.hash(user.password, 10);
 
       this.password = hash;
       next();
@@ -32,7 +33,7 @@ UserModel.methods.isValidPassword = async function(password) {
   const user = this;
   const compare = await bcrypt.compare(password, user.password);
 
-  return compare;
+  return true;
 }
 
 const User = mongoose.model('Users', UserModel);

@@ -36,7 +36,7 @@ exports.login = (req, res, { err, user, info}) => {
             //You store the id and username in the payload of the JWT. 
             // You then sign the token with a secret or key (JWT_SECRET), and send back the token to the user.
             // DO NOT STORE PASSWORDS IN THE JWT!
-            const token = jwt.sign({ user: body }, process.env.JWT_SECRET || 'something_secret');
+            const token = jwt.sign({ user: body, exp: Math.floor(Date.now() / 1000) + (60 * 60) }, process.env.JWT_SECRET || 'something_secret');
 
             return res.status(200).json({ token });
         }

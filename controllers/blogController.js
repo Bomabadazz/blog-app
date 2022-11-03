@@ -69,7 +69,7 @@ exports.getBlogs  = async (req, res) => {
     }
 
 
-    const blogs = await blogModel
+    const blogs = await BlogModel
     .find(findQuery)
     .sort(sortQuery)
     .skip(page)
@@ -82,7 +82,7 @@ exports.updateBlog = async (req, res) => {
     const { id } = req.params;
     const { state } = req.body;
 
-    const blog = await blogModel.findById(id)
+    const blog = await BlogModel.findById(id)
 
     if (!blog) {
         return res.status(404).json({ status: false, blog: null })
