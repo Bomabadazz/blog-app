@@ -38,7 +38,7 @@ exports.getBlogs  = async (req, res) => {
         blog = 'asc', 
         blog_by = 'created_at', 
         page = 1, 
-        per_page = 10 
+        per_page = 20 
     } = query;
 
     const findQuery = {};
