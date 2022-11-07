@@ -9,24 +9,21 @@ const ExtractJWT = require('passport-jwt').ExtractJwt;
 passport.use(
     new JWTstrategy(
         {
-            secretOrKey: process.env.JWT_SECRET || 'something_secret',
-            // jwtFromRequest: ExtractJWT.fromUrlQueryParameter('secret_token')
-            jwtFromRequest: ExtractJWT.fromAuthHeaderAsBearerToken() // Use this if you are using Bearer token
+            secretOrKey: process.env.JWT_SECRET,
+            jwtFromRequest: ExtractJWT.fromAuthHeaderAsBearerToken()
         },
         async (token, done) => {
             try {
-                return done(null, token.user);
+                const { username } = token.user;
+                const user = await UserModel.findOne({ username });
+                return done(null, user);
             } catch (error) {
+                console.log(error)
                 done(error);
             }
         }
     )
 );
-
-
-// This middleware saves the information provided by the user to the database,
-// and then sends the user information to the next middleware if successful.
-// Otherwise, it reports an error.
 
 passport.use(
     'signup',
@@ -48,9 +45,6 @@ passport.use(
     )
 );
 
-// This middleware authenticates the user based on the username and password provided.
-// If the user is found, it sends the user information to the next middleware.
-// Otherwise, it reports an error.
 passport.use(
     'login',
     new localStrategy(
@@ -62,14 +56,12 @@ passport.use(
         async (req, username, password, done) => {
             try {
                 const user = await UserModel.findOne({ username });
-                               
 
                 if (!user) {
                     return done(null, false, { message: 'User not found' });
                 }
 
                 const validate = await user.isValidPassword(password);
-    
                 if (!validate) {
                     return done(null, false, { message: 'Wrong Password' });
                 }

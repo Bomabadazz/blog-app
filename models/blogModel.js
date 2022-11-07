@@ -9,15 +9,28 @@ const BlogSchema = new Schema({
   title: String,
   description: String,
   author: {
-    type: ObjectId, required: true, ref: 'User'
+    type: ObjectId, required: true, ref: 'Users'
   },
-  timestamp: Date,
-  state: { type: String, enum: ['draft', 'published']},
-  read_count: Number,
+  state: { type: String, enum: ['draft', 'published'], default: 'draft'},
+  read_count: { type: Number, default: 1 },
   reading_time: Number,
   body: String,
   tags: [String]
 });
+
+BlogSchema.pre(
+  'save',
+  function (next) {
+      const blog = this;
+      const text = blog.title + ' ' + blog.description + ' ' + blog.body;
+      const wpm = 100;
+      const words = text.trim().split(/\s+/).length;
+      const time = Math.ceil(words / wpm);
+
+      blog.reading_time = time;
+      next();
+  }
+);
 
 const Blog = mongoose.model('Blog', BlogSchema);
 

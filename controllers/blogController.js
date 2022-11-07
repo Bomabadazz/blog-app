@@ -1,108 +1,97 @@
-const { BlogModel } = require('../models')
+const request = require('supertest')
+const { connect } = require('./database')
+const app = require('../index');
 const moment = require('moment');
+const { BlogModel, UserModel } = require('../models');
 
-exports.createBlog = async (req, res) => {
-    const body = req.body;
 
-    const total_price = body.items.reduce((prev, curr) => {
-        prev += curr.price
-        return prev
-    }, 0);
+describe('Blog Route', () => {
+    let conn;
+    let token;
+    let user;
 
-    const blog = await BlogModel.create({ 
-        items: body.items,
-        created_at: moment().toDate(),
-        total_price
+    beforeAll(async () => {
+        conn = await connect()
+
+        user = await UserModel.create({ username: 'boma', password: '123456', email: 'boma@talent.com'});
+
+        const loginResponse = await request(app)
+        .post('/login')
+        .set('content-type', 'application/json')
+        .send({ 
+            username: 'boma', 
+            password: '123456'
+        });
+
+        token = loginResponse.body.token;
     })
-    
-    return res.json({ status: true, blog })
-}
 
-exports.getBlog = async (req, res) => {
-    const { blogId } = req.params;
-    const blog = await BlogModel.findById(blogId)
+    afterEach(async () => {
+        await conn.cleanup()
+    })
 
-    if (!blog) {
-        return res.status(404).json({ status: false, blog: null })
-    }
+    afterAll(async () => {
+        await conn.disconnect()
+    })
 
-    return res.json({ status: true, blog })
-}
+    it('should return blogs', async () => {
+        // create blog in our db
+        await BlogModel.create({ 
+            title: 'Building a nodejs app',
+            created_at: moment().toDate(),
+            description: 'An express app',
+            body: 'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean.',
+            tags: ['dev', 'javascript', 'node'],
+            author: user,
+        })
 
-exports.getBlogs  = async (req, res) => {
-    const { query } = req;
+        await BlogModel.create({ 
+            title: 'Building a frontend app',
+            created_at: moment().toDate(),
+            description: 'A react app',
+            body: 'A small river named Duden flows by their place and supplies it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth.',
+            tags: ['dev', 'javascript', 'react'],
+            author: user,
+        })
 
-    const { 
-        created_at, 
-        state, 
-        blog = 'asc', 
-        blog_by = 'created_at', 
-        page = 1, 
-        per_page = 20 
-    } = query;
+        const response = await request(app)
+        .get('/blogs')
+        .set('content-type', 'application/json')
+        .set('Authorization', `Bearer ${token}`)
 
-    const findQuery = {};
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveProperty('blogs')
+        expect(response.body).toHaveProperty('status', true)
+    })
 
-    if (created_at) {
-        findQuery.created_at = {
-            $gt: moment(created_at).startOf('day').toDate(), 
-            $lt: moment(created_at).endOf('day').toDate(),
-        }
-    } 
+    it('should return blogs with dev tag', async () => {
+        // create order in our db
+        await BlogModel.create({ 
+            title: 'Building a nodejs app',
+            created_at: moment().toDate(),
+            description: 'An express app',
+            body: 'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean.',
+            tags: ['dev', 'javascript', 'node'],
+            author: user,
+        })
 
-    if (state) {
-        findQuery.state = state;
-    }
+        await BlogModel.create({ 
+            title: 'Building a frontend app',
+            created_at: moment().toDate(),
+            description: 'A react app',
+            body: 'A small river named Duden flows by their place and supplies it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth.',
+            tags: ['dev', 'javascript', 'react'],
+            author: user,
+        })
 
-    const sortQuery = {};
+        const response = await request(app)
+        .get('/blogs?tags=dev')
+        .set('content-type', 'application/json')
+        .set('Authorization', `Bearer ${token}`)
 
-    const sortAttributes = blog_by.split(',')
-
-    for (const attribute of sortAttributes) {
-        if (blog === 'asc' && blog_by) {
-            sortQuery[attribute] = 1
-        }
-    
-        if (blog === 'desc' && blog_by) {
-            sortQuery[attribute] = -1
-        }
-    }
-
-
-    const blogs = await BlogModel
-    .find(findQuery)
-    .sort(sortQuery)
-    .skip(page)
-    .limit(per_page)
-
-    return res.status(200).json({ status: true, blogs })
-}
-
-exports.updateBlog = async (req, res) => {
-    const { id } = req.params;
-    const { state } = req.body;
-
-    const blog = await BlogModel.findById(id)
-
-    if (!blog) {
-        return res.status(404).json({ status: false, blog: null })
-    }
-
-    if (state < blog.state) {
-        return res.status(422).json({ status: false, blog: null, message: 'Invalid operation' })
-    }
-
-    blog.state = state;
-
-    await blog.save()
-
-    return res.json({ status: true, blog })
-}
-
-exports.deleteBlog = async (req, res) => {
-    const { id } = req.params;
-
-    const blog = await BlogModel.deleteOne({ _id: id})
-
-    return res.json({ status: true, blog })
-}
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveProperty('blogs')
+        expect(response.body).toHaveProperty('status', true)
+        expect(response.body.blogs.every(blog => blog.tags.includes('dev'))).toBe(true)
+    })
+});
