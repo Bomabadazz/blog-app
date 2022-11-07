@@ -32,16 +32,16 @@ describe('Auth: Signup', () => {
         expect(response.status).toBe(201)
         expect(response.body).toHaveProperty('message')
         expect(response.body).toHaveProperty('user')
-        expect(response.body.user).toHaveProperty('username', 'tobi')
-        expect(response.body.user).toHaveProperty('firstname', 'tobie')
-        expect(response.body.user).toHaveProperty('lastname', 'Augustina')
-        expect(response.body.user).toHaveProperty('email', 'tobi@mail.com')        
+        expect(response.body.user).toHaveProperty('username', 'boma')
+        expect(response.body.user).toHaveProperty('firstname', 'boma')
+        expect(response.body.user).toHaveProperty('lastname', 'johnson')
+        expect(response.body.user).toHaveProperty('email', 'boma@gmail.com')        
     })
 
 
     it('should login a user', async () => {
         // create user in out db
-        const user = await UserModel.create({ username: 'tobi', password: '123456'});
+        const user = await UserModel.create({ username: 'boma', password: '123456'});
 
         // login user
         const response = await request(app)

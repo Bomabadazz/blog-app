@@ -1,97 +1,176 @@
-const request = require('supertest')
-const { connect } = require('./database')
-const app = require('../index');
-const moment = require('moment');
-const { BlogModel, UserModel } = require('../models');
+const { BlogModel } = require('../models')
+const moment = require('moment'); 
 
+exports.createBlog = async (req, res) => {
+    const {
+        title,
+        description,
+        body,
+        tags
+      } = req.body;
 
-describe('Blog Route', () => {
-    let conn;
-    let token;
-    let user;
+    const author = req.user;
 
-    beforeAll(async () => {
-        conn = await connect()
-
-        user = await UserModel.create({ username: 'boma', password: '123456', email: 'boma@talent.com'});
-
-        const loginResponse = await request(app)
-        .post('/login')
-        .set('content-type', 'application/json')
-        .send({ 
-            username: 'boma', 
-            password: '123456'
-        });
-
-        token = loginResponse.body.token;
+    const blog = await BlogModel.create({ 
+        title,
+        created_at: moment().toDate(),
+        description,
+        body,
+        tags,
+        author,
     })
+    
+    return res.json({ status: true, blog })
+}
 
-    afterEach(async () => {
-        await conn.cleanup()
-    })
+exports.getBlog = async (req, res) => {
+    const { blogId } = req.params;
+    const blog = await BlogModel.findById(blogId).populate('author');
 
-    afterAll(async () => {
-        await conn.disconnect()
-    })
+    if (!blog) {
+        return res.status(404).json({ status: false, blog: null })
+    }
+    blog.read_count = blog.read_count + 1;
 
-    it('should return blogs', async () => {
-        // create blog in our db
-        await BlogModel.create({ 
-            title: 'Building a nodejs app',
-            created_at: moment().toDate(),
-            description: 'An express app',
-            body: 'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean.',
-            tags: ['dev', 'javascript', 'node'],
-            author: user,
-        })
+    await blog.save()
 
-        await BlogModel.create({ 
-            title: 'Building a frontend app',
-            created_at: moment().toDate(),
-            description: 'A react app',
-            body: 'A small river named Duden flows by their place and supplies it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth.',
-            tags: ['dev', 'javascript', 'react'],
-            author: user,
-        })
+    blog.author.password = null;
 
-        const response = await request(app)
-        .get('/blogs')
-        .set('content-type', 'application/json')
-        .set('Authorization', `Bearer ${token}`)
+    return res.json({ status: true, blog })
+}
 
-        expect(response.status).toBe(200)
-        expect(response.body).toHaveProperty('blogs')
-        expect(response.body).toHaveProperty('status', true)
-    })
+exports.getBlogs  = async (req, res) => {
+    const { query } = req;
+    const {
+        author,
+        title, 
+        tags, 
+        order = 'asc', 
+        order_by = 'created_at', 
+        page = 1, 
+        per_page = 20 
+    } = query;
 
-    it('should return blogs with dev tag', async () => {
-        // create order in our db
-        await BlogModel.create({ 
-            title: 'Building a nodejs app',
-            created_at: moment().toDate(),
-            description: 'An express app',
-            body: 'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean.',
-            tags: ['dev', 'javascript', 'node'],
-            author: user,
-        })
+    const findQuery = {};
 
-        await BlogModel.create({ 
-            title: 'Building a frontend app',
-            created_at: moment().toDate(),
-            description: 'A react app',
-            body: 'A small river named Duden flows by their place and supplies it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth.',
-            tags: ['dev', 'javascript', 'react'],
-            author: user,
-        })
+    if (author) {
+        findQuery.author = author;
+    }
+    if (title) {
+        findQuery.title = title;
+    }
+    if (tags) {
+        const filterTags = tags.split(',')
+        findQuery.tags = { $in: filterTags }
+    }
 
-        const response = await request(app)
-        .get('/blogs?tags=dev')
-        .set('content-type', 'application/json')
-        .set('Authorization', `Bearer ${token}`)
+    const sortQuery = {};
 
-        expect(response.status).toBe(200)
-        expect(response.body).toHaveProperty('blogs')
-        expect(response.body).toHaveProperty('status', true)
-        expect(response.body.blogs.every(blog => blog.tags.includes('dev'))).toBe(true)
-    })
-});
+    const sortAttributes = order_by.split(',')
+
+    for (const attribute of sortAttributes) {
+        if (order === 'asc' && order_by) {
+            sortQuery[attribute] = 1
+        }
+    
+        if (order === 'desc' && order_by) {
+            sortQuery[attribute] = -1
+        }
+    }
+
+    const blogs = await BlogModel
+    .find(findQuery)
+    .sort(sortQuery)
+    .skip(page - 1)
+    .limit(per_page)
+
+    return res.status(200).json({ status: true, blogs })
+}
+exports.getAuthorBlogs  = async (req, res) => {
+    const { query, user } = req;
+    const {
+        state, 
+        page = 1, 
+        per_page = 20 
+    } = query;
+
+    const findQuery = {
+        author: user
+    };
+
+    if (state) {
+        findQuery.author = state;
+    }
+    
+    const blogs = await BlogModel
+    .find(findQuery)
+    .skip(page - 1)
+    .limit(per_page)
+
+    return res.status(200).json({ status: true, blogs })
+}
+
+exports.updateBlog = async (req, res) => {
+    const { id } = req.params;
+    const {
+        title,
+        description,
+        body,
+        tags
+    } = req.body; 
+
+    const author = req.user;
+
+    const blog = await BlogModel.findOne({ _id: id, author })
+
+    if (!blog) {
+        return res.status(404).json({ status: false, blog: null })
+    }
+    
+    blog.title = title;
+    blog.description = description;
+    blog.body = body;
+    blog.tags = tags;
+
+    await blog.save()
+
+    return res.json({ status: true, blog })
+}
+
+exports.updateBlogState = async (req, res) => {
+    const { id } = req.params;
+    const { state } = req.body;
+    const author = req.user;
+    console.log(author)
+    const blog = await BlogModel.findOne({ _id: id, author })
+
+    if (!blog) {
+        return res.status(404).json({ status: false, blog: null })
+    }
+    
+    if (state !== 'published') {
+        return res.status(422).json({ status: false, blog: null, message: 'Invalid operation' })
+    }
+
+    blog.state = state;
+
+    await blog.save()
+
+    return res.json({ status: true, blog })
+}
+
+exports.deleteBlog = async (req, res) => {
+    const { id } = req.params;
+    const author = req.user;
+
+    const blog = await BlogModel.findOne({ _id: id, author })
+
+    if (!blog) {
+        return res.status(404).json({ status: false, blog: null })
+    }
+
+    blog.deleteOne();
+    await blog.save()
+
+    return res.json({ status: true, blog })
+}
